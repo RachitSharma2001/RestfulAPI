@@ -19,7 +19,7 @@ type enduser struct {
 	email    string
 }
 
-func (e *enduser) getJsonOfUser() string {
+func (e *enduser) getJsonRepresentingUser() string {
 	return fmt.Sprintf(`{"id" : %d, "password" : "%s", "email" : "%s"}`, e.id, e.password, e.email)
 }
 
@@ -47,7 +47,7 @@ func createRandomUserId() int {
 
 func callAddUserEndpoint(test *testing.T, addUserRecorder *httptest.ResponseRecorder, userToAdd enduser) {
 	test.Helper()
-	jsonOfUserToAdd := userToAdd.getJsonOfUser()
+	jsonOfUserToAdd := userToAdd.getJsonRepresentingUser()
 	addUserContext := createContextWithData(addUserRecorder, jsonOfUserToAdd)
 	HandleAddUser(addUserContext)
 }
@@ -60,14 +60,14 @@ func createContextWithData(recorder *httptest.ResponseRecorder, data string) *gi
 
 func verifyUserAdded(test *testing.T, addUserRecorder *httptest.ResponseRecorder, userToAdd enduser) {
 	test.Helper()
-	verifyStatusOk(test, addUserRecorder)
+	verifyNoErrThrown(test, addUserRecorder)
 	verifyUserExistsInDb(test, userToAdd)
 }
 
 func verifyUserExistsInDb(test *testing.T, userToAdd enduser) {
 	test.Helper()
 	readUserJson := readUserFromDb(test, userToAdd.email)
-	checkCorrectJsonOutput(test, userToAdd.getJsonOfUser(), readUserJson)
+	checkCorrectJsonOutput(test, userToAdd.getJsonRepresentingUser(), readUserJson)
 }
 
 func readUserFromDb(test *testing.T, userEmail string) string {
@@ -104,11 +104,11 @@ func createContextWithEmailEncoded(recorder *httptest.ResponseRecorder, givenEma
 
 func verifyCorrectRead(test *testing.T, recorder *httptest.ResponseRecorder) {
 	test.Helper()
-	verifyStatusOk(test, recorder)
-	verifyCorrectOutputForGet(test, recorder)
+	verifyNoErrThrown(test, recorder)
+	verifyCorrectUserRead(test, recorder)
 }
 
-func verifyStatusOk(test *testing.T, recorder *httptest.ResponseRecorder) {
+func verifyNoErrThrown(test *testing.T, recorder *httptest.ResponseRecorder) {
 	test.Helper()
 	expectedErrCode := http.StatusOK
 	observedErrCode := recorder.Code
@@ -126,7 +126,7 @@ func errorCodesMatch(expectedErrCode, observedErrCode int) bool {
 	return expectedErrCode == observedErrCode
 }
 
-func verifyCorrectOutputForGet(test *testing.T, recorder *httptest.ResponseRecorder) {
+func verifyCorrectUserRead(test *testing.T, recorder *httptest.ResponseRecorder) {
 	test.Helper()
 	observedJson := recorder.Body.String()
 	expectedJson := `{"id" : 10, "password" : "something", "email" : "somebody@gmail.com"}`
