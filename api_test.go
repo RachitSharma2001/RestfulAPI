@@ -46,6 +46,7 @@ func createRandomUserId() int {
 }
 
 func callAddUserEndpoint(test *testing.T, addUserRecorder *httptest.ResponseRecorder, userToAdd enduser) {
+	test.Helper()
 	jsonOfUserToAdd := userToAdd.getJsonOfUser()
 	addUserContext := createContextWithData(addUserRecorder, jsonOfUserToAdd)
 	HandleAddUser(addUserContext)
@@ -58,28 +59,35 @@ func createContextWithData(recorder *httptest.ResponseRecorder, data string) *gi
 }
 
 func verifyUserAdded(test *testing.T, addUserRecorder *httptest.ResponseRecorder, userToAdd enduser) {
-	checkCorrectErrorCode(test, http.StatusOK, addUserRecorder.Code)
-	readUserRecorder := httptest.NewRecorder()
-	readUserContext := createContextWithEmailEncoded(readUserRecorder, userToAdd.email)
-	readUserJson := getReadUserJsonResult(readUserRecorder, readUserContext)
+	test.Helper()
+	verifyStatusOk(test, addUserRecorder)
+	verifyUserExistsInDb(test, userToAdd)
+}
+
+func verifyUserExistsInDb(test *testing.T, userToAdd enduser) {
+	test.Helper()
+	readUserJson := readUserFromDb(test, userToAdd.email)
 	checkCorrectJsonOutput(test, userToAdd.getJsonOfUser(), readUserJson)
 }
 
-func getReadUserJsonResult(readUserRecorder *httptest.ResponseRecorder, readUserContext *gin.Context) string {
-	HandleGetUserByEmail(readUserContext)
+func readUserFromDb(test *testing.T, userEmail string) string {
+	test.Helper()
+	readUserRecorder := httptest.NewRecorder()
+	callReadUserEndpoint(test, readUserRecorder, userEmail)
 	return readUserRecorder.Body.String()
 }
 
 func TestReadUser(test *testing.T) {
 	recorder := httptest.NewRecorder()
+	userEmail := "somebody@gmail.com"
 	InitDB()
-	callReadUserEndpoint(test, recorder)
+	callReadUserEndpoint(test, recorder, userEmail)
 	verifyCorrectRead(test, recorder)
 }
 
-func callReadUserEndpoint(test *testing.T, recorder *httptest.ResponseRecorder) {
+func callReadUserEndpoint(test *testing.T, recorder *httptest.ResponseRecorder, userEmail string) {
 	test.Helper()
-	contextWithEmail := createContextWithEmailEncoded(recorder, "somebody@gmail.com")
+	contextWithEmail := createContextWithEmailEncoded(recorder, userEmail)
 	HandleGetUserByEmail(contextWithEmail)
 }
 
@@ -96,11 +104,11 @@ func createContextWithEmailEncoded(recorder *httptest.ResponseRecorder, givenEma
 
 func verifyCorrectRead(test *testing.T, recorder *httptest.ResponseRecorder) {
 	test.Helper()
-	verifyCorrectErrCodeForGet(test, recorder)
+	verifyStatusOk(test, recorder)
 	verifyCorrectOutputForGet(test, recorder)
 }
 
-func verifyCorrectErrCodeForGet(test *testing.T, recorder *httptest.ResponseRecorder) {
+func verifyStatusOk(test *testing.T, recorder *httptest.ResponseRecorder) {
 	test.Helper()
 	expectedErrCode := http.StatusOK
 	observedErrCode := recorder.Code
