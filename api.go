@@ -11,11 +11,18 @@ import (
 
 var db *gorm.DB
 
-func HandleGetUserByEmail(context *gin.Context) {
-	email := context.Param("email")
-	user := map[string]interface{}{}
-	db.Table("enduser").Where("email = ?", email).Take(&user)
-	context.IndentedJSON(http.StatusOK, &user)
+type enduser struct {
+	id       int
+	password string
+	email    string
+}
+
+func main() {
+	InitDB()
+	router := gin.Default()
+	router.GET("/enduser/:email", HandleGetUserByEmail)
+	router.POST("/enduser", HandleAddUser)
+	router.Run(":8080")
 }
 
 func InitDB() {
@@ -27,9 +34,20 @@ func InitDB() {
 	}
 }
 
-func main() {
-	InitDB()
-	router := gin.Default()
-	router.GET("/enduser/:email", HandleGetUserByEmail)
-	router.Run(":8080")
+func HandleGetUserByEmail(context *gin.Context) {
+	email := context.Param("email")
+	user := map[string]interface{}{}
+	db.Table("enduser").Where("email = ?", email).Take(&user)
+	context.IndentedJSON(http.StatusOK, &user)
+}
+
+func HandleAddUser(context *gin.Context) {
+	user := map[string]interface{}{}
+	context.BindJSON(&user)
+	result := db.Table("enduser").Create(&user)
+	if result.Error != nil {
+		context.IndentedJSON(http.StatusBadRequest, result.Error)
+	} else {
+		context.IndentedJSON(http.StatusOK, `{"success" : "true"}`)
+	}
 }

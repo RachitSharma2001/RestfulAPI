@@ -1,17 +1,51 @@
 package main
 
 import (
+	"bytes"
+	"fmt"
+	"math/rand"
+	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
 
+func TestAddUser(test *testing.T) {
+	test.Run("Add New User", func(subtest *testing.T) {
+		InitDB()
+		addUserRecorder := httptest.NewRecorder()
+		s1 := rand.NewSource(time.Now().UnixNano())
+		userId := rand.New(s1).Intn(100000)
+		email := fmt.Sprintf("ronald%d@gmail.com", userId)
+		addUserJson := fmt.Sprintf(`{"id" : %d, "password" : "randompass", "email" : "%s"}`, userId, email)
+		addUserContext := createContextWithData(addUserRecorder, addUserJson)
+		HandleAddUser(addUserContext)
+		checkCorrectErrorCode(test, 200, addUserRecorder.Code)
+		readUserRecorder := httptest.NewRecorder()
+		readUserContext := createContextWithEmailEncoded(readUserRecorder, email)
+		readUserJson := getReadUserJsonResult(readUserRecorder, readUserContext)
+		checkCorrectJsonOutput(test, addUserJson, readUserJson)
+	})
+}
+
+func createContextWithData(recorder *httptest.ResponseRecorder, givenData string) *gin.Context {
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request, _ = http.NewRequest(http.MethodPost, "/", bytes.NewBuffer([]byte(givenData)))
+	return context
+}
+
+func getReadUserJsonResult(readUserRecorder *httptest.ResponseRecorder, readUserContext *gin.Context) string {
+	HandleGetUserByEmail(readUserContext)
+	return readUserRecorder.Body.String()
+}
+
 func TestReadUser(test *testing.T) {
 	InitDB()
 	recorder := httptest.NewRecorder()
-	context := createContextWithEmail(recorder, "somebody@gmail.com")
+	context := createContextWithEmailEncoded(recorder, "somebody@gmail.com")
 	HandleGetUserByEmail(context)
 	checkCorrectErrorCode(test, 200, recorder.Code)
 	observedJson := recorder.Body.String()
@@ -19,7 +53,7 @@ func TestReadUser(test *testing.T) {
 	checkCorrectJsonOutput(test, expectedJson, observedJson)
 }
 
-func createContextWithEmail(recorder *httptest.ResponseRecorder, givenEmail string) *gin.Context {
+func createContextWithEmailEncoded(recorder *httptest.ResponseRecorder, givenEmail string) *gin.Context {
 	context, _ := gin.CreateTestContext(recorder)
 	context.Params = []gin.Param{
 		{
