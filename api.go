@@ -11,12 +11,6 @@ import (
 
 var db *gorm.DB
 
-type enduser struct {
-	id       int
-	password string
-	email    string
-}
-
 func main() {
 	InitDB()
 	router := gin.Default()
@@ -28,10 +22,14 @@ func main() {
 func InitDB() {
 	var err error
 	db, err = GetDatabase()
-	if err != nil {
-		fmt.Printf("Unexpected connection error: %v", err)
-		os.Exit(3)
+	if errorExists(err) {
+		throwConnectionError(err)
 	}
+}
+
+func throwConnectionError(err error) {
+	fmt.Printf("Unexpected connection error: %v", err)
+	os.Exit(3)
 }
 
 func HandleGetUserByEmail(context *gin.Context) {
@@ -45,9 +43,13 @@ func HandleAddUser(context *gin.Context) {
 	user := map[string]interface{}{}
 	context.BindJSON(&user)
 	result := db.Table("enduser").Create(&user)
-	if result.Error != nil {
+	if errorExists(result.Error) {
 		context.IndentedJSON(http.StatusBadRequest, result.Error)
 	} else {
 		context.IndentedJSON(http.StatusOK, `{"success" : "true"}`)
 	}
+}
+
+func errorExists(err error) bool {
+	return err != nil
 }
