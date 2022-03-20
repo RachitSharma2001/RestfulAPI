@@ -41,8 +41,10 @@ func createUserToAdd() enduser {
 }
 
 func createRandomUserId() int {
-	s1 := rand.NewSource(time.Now().UnixNano())
-	return rand.New(s1).Intn(100000)
+	randomSeed := time.Now().UnixNano()
+	maxId := 100000
+	s1 := rand.NewSource(randomSeed)
+	return rand.New(s1).Intn(maxId)
 }
 
 func callAddUserEndpoint(test *testing.T, addUserRecorder *httptest.ResponseRecorder, userToAdd enduser) {
