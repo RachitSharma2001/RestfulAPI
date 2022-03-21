@@ -95,9 +95,13 @@ func HandlePutUser(context *gin.Context) {
 	} else if errorExists(bindErr) {
 		encodeBadRequestInContext(context)
 	} else {
-		db.Table("enduser").Where("email = ?", email).Update("password", user["password"])
+		changeUserPasswordInDb(email, user["password"])
 		encodeSuccessInContext(context)
 	}
+}
+
+func changeUserPasswordInDb(email string, newPassword interface{}) {
+	db.Table("enduser").Where("email = ?", email).Update("password", newPassword)
 }
 
 func HandleDeleteUser(context *gin.Context) {
@@ -105,10 +109,14 @@ func HandleDeleteUser(context *gin.Context) {
 	if !userExists(email) {
 		encodeNotFoundErrInContext(context)
 	} else {
-		user := map[string]interface{}{}
-		db.Table("enduser").Where("email = ?", email).Delete(&user)
+		deleteUserFromDb(email)
 		encodeSuccessInContext(context)
 	}
+}
+
+func deleteUserFromDb(email string) {
+	user := map[string]interface{}{}
+	db.Table("enduser").Where("email = ?", email).Delete(&user)
 }
 
 func userExists(email string) bool {
