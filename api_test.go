@@ -231,3 +231,36 @@ func getUserPassword(userInfo string) string {
 	json.Unmarshal([]byte(userInfo), &userMap)
 	return userMap["password"]
 }
+
+func TestDelete(test *testing.T) {
+	newUser := createNewUser()
+	addUserToDb(test, newUser)
+	deleteUser(test, newUser)
+	verifyUserDeleted(test, newUser)
+}
+
+func addUserToDb(test *testing.T, userToAdd enduser) {
+	test.Helper()
+	InitDB()
+	addUserRecorder := httptest.NewRecorder()
+	callAddUserEndpoint(test, addUserRecorder, userToAdd)
+	CloseDB()
+}
+
+func deleteUser(test *testing.T, userToDelete enduser) {
+	test.Helper()
+	InitDB()
+	deleteUserRecorder := httptest.NewRecorder()
+	deleteUserContext := createContextWithEmailEncoded(deleteUserRecorder, userToDelete.email)
+	HandleDeleteUser(deleteUserContext)
+	CloseDB()
+}
+
+func verifyUserDeleted(test *testing.T, user enduser) {
+	test.Helper()
+	InitDB()
+	readUserRecorder := httptest.NewRecorder()
+	callReadUserEndpoint(test, readUserRecorder, user.email)
+	verifyNotFoundErrThrown(test, readUserRecorder)
+	CloseDB()
+}

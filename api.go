@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"net/http"
 	"os"
@@ -31,6 +32,24 @@ func InitDB() {
 	if errorExists(err) {
 		throwConnectionError(err)
 	}
+}
+
+func CloseDB() {
+	sqlDb, err := db.DB()
+	if errorExists(err) {
+		throwCloseError(err)
+	} else {
+		closeSqlDB(sqlDb)
+	}
+}
+
+func closeSqlDB(sqlDb *sql.DB) {
+	sqlDb.Close()
+}
+
+func throwCloseError(err error) {
+	fmt.Printf("Unexpected error while closing: %v", err)
+	os.Exit(3)
 }
 
 func throwConnectionError(err error) {
@@ -77,7 +96,6 @@ func HandleDeleteUser(context *gin.Context) {
 func userExists(email string) bool {
 	user := map[string]interface{}{}
 	resultOfReadUser := db.Table("enduser").Where("email = ?", email).Take(&user)
-	fmt.Printf("Read user error: %v\n", resultOfReadUser.Error)
 	return !errorExists(resultOfReadUser.Error)
 }
 
