@@ -14,7 +14,7 @@ var db *gorm.DB
 var userNotFoundMsg map[string]interface{} = gin.H{"success": "false", "error": "user not found"}
 var userAlreadyExistsMsg map[string]interface{} = gin.H{"success": "false", "error": "user already exists"}
 var successMsg map[string]interface{} = gin.H{"success": "true"}
-var invalidPasswordDataMsg map[string]interface{} = gin.H{"success": "false", "error": "Invalid password data given"}
+var badRequestMsg map[string]interface{} = gin.H{"success": "false", "error": "Invalid data given"}
 
 func main() {
 	InitDB()
@@ -43,8 +43,9 @@ func CloseDB() {
 	}
 }
 
-func closeSqlDB(sqlDb *sql.DB) {
-	sqlDb.Close()
+func throwConnectionError(err error) {
+	fmt.Printf("Unexpected connection error: %v", err)
+	os.Exit(3)
 }
 
 func throwCloseError(err error) {
@@ -52,20 +53,37 @@ func throwCloseError(err error) {
 	os.Exit(3)
 }
 
-func throwConnectionError(err error) {
-	fmt.Printf("Unexpected connection error: %v", err)
-	os.Exit(3)
+func closeSqlDB(sqlDb *sql.DB) {
+	sqlDb.Close()
+}
+
+func HandleAddUser(context *gin.Context) {
+	user := map[string]interface{}{}
+	bindErr := context.ShouldBindJSON(&user)
+	createUserErr := db.Table("enduser").Create(&user).Error
+	if errorExists(bindErr) {
+		encodeBadRequestInContext(context)
+	} else if errorExists(createUserErr) {
+		encodeConflictErrInContext(context)
+	} else {
+		encodeSuccessInContext(context)
+	}
 }
 
 func HandleGetUserByEmail(context *gin.Context) {
 	email := context.Param("email")
 	if !userExists(email) {
-		context.IndentedJSON(http.StatusNotFound, userNotFoundMsg)
+		encodeNotFoundErrInContext(context)
 	} else {
-		user := map[string]interface{}{}
-		db.Table("enduser").Where("email = ?", email).Take(&user)
-		context.IndentedJSON(http.StatusOK, &user)
+		user := getUserFromDB(email)
+		encodeUserInfoInContext(context, user)
 	}
+}
+
+func getUserFromDB(email string) map[string]interface{} {
+	user := map[string]interface{}{}
+	db.Table("enduser").Where("email = ?", email).Take(&user)
+	return user
 }
 
 func HandlePutUser(context *gin.Context) {
@@ -73,23 +91,23 @@ func HandlePutUser(context *gin.Context) {
 	user := map[string]interface{}{}
 	bindErr := context.ShouldBindJSON(&user)
 	if !userExists(email) {
-		context.IndentedJSON(http.StatusNotFound, userNotFoundMsg)
+		encodeNotFoundErrInContext(context)
 	} else if errorExists(bindErr) {
-		context.IndentedJSON(http.StatusBadRequest, invalidPasswordDataMsg)
+		encodeBadRequestInContext(context)
 	} else {
 		db.Table("enduser").Where("email = ?", email).Update("password", user["password"])
-		context.IndentedJSON(http.StatusOK, successMsg)
+		encodeSuccessInContext(context)
 	}
 }
 
 func HandleDeleteUser(context *gin.Context) {
 	email := context.Param("email")
 	if !userExists(email) {
-		context.IndentedJSON(http.StatusNotFound, userNotFoundMsg)
+		encodeNotFoundErrInContext(context)
 	} else {
 		user := map[string]interface{}{}
 		db.Table("enduser").Where("email = ?", email).Delete(&user)
-		context.IndentedJSON(http.StatusOK, successMsg)
+		encodeSuccessInContext(context)
 	}
 }
 
@@ -99,15 +117,24 @@ func userExists(email string) bool {
 	return !errorExists(resultOfReadUser.Error)
 }
 
-func HandleAddUser(context *gin.Context) {
-	user := map[string]interface{}{}
-	context.BindJSON(&user)
-	result := db.Table("enduser").Create(&user)
-	if errorExists(result.Error) {
-		context.IndentedJSON(http.StatusConflict, userAlreadyExistsMsg)
-	} else {
-		context.IndentedJSON(http.StatusOK, successMsg)
-	}
+func encodeNotFoundErrInContext(context *gin.Context) {
+	context.IndentedJSON(http.StatusNotFound, userNotFoundMsg)
+}
+
+func encodeSuccessInContext(context *gin.Context) {
+	context.IndentedJSON(http.StatusOK, successMsg)
+}
+
+func encodeConflictErrInContext(context *gin.Context) {
+	context.IndentedJSON(http.StatusConflict, userAlreadyExistsMsg)
+}
+
+func encodeUserInfoInContext(context *gin.Context, user map[string]interface{}) {
+	context.IndentedJSON(http.StatusOK, &user)
+}
+
+func encodeBadRequestInContext(context *gin.Context) {
+	context.IndentedJSON(http.StatusBadRequest, badRequestMsg)
 }
 
 func errorExists(err error) bool {
