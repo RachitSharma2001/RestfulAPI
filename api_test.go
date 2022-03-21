@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -14,9 +15,9 @@ import (
 )
 
 type enduser struct {
+	email    string
 	id       int
 	password string
-	email    string
 }
 
 func (e *enduser) getJsonRepresentingUser() string {
@@ -41,13 +42,13 @@ func TestAddUser(test *testing.T) {
 }
 
 func createNewUser() enduser {
-	userId := createRandomUserId()
+	userId := createRandomUserInteger()
 	password := "randompass"
 	email := fmt.Sprintf("ronald%d@gmail.com", userId)
 	return enduser{id: userId, password: password, email: email}
 }
 
-func createRandomUserId() int {
+func createRandomUserInteger() int {
 	randomSeed := time.Now().UnixNano()
 	maxId := 100000
 	source := rand.NewSource(randomSeed)
@@ -172,4 +173,61 @@ func verifyCorrectUserRead(test *testing.T, recorder *httptest.ResponseRecorder)
 func checkCorrectJsonOutput(test *testing.T, expectedJson string, observedJson string) {
 	test.Helper()
 	require.JSONEq(test, expectedJson, observedJson)
+}
+
+func TestPut(test *testing.T) {
+	test.Run("Update existing user password", func(subtest *testing.T) {
+		addUserRecorder := httptest.NewRecorder()
+		userEmail := "somebody@gmail.com"
+		newPassword := createRandomPassword()
+		InitDB()
+		changeUserPassword(subtest, addUserRecorder, userEmail, newPassword)
+		verifyUpdateOccurred(subtest, addUserRecorder, userEmail, newPassword)
+	})
+	test.Run("Update non-existing user password", func(subtest *testing.T) {
+		addUserRecorder := httptest.NewRecorder()
+		userEmail := "adfsdfsad@gmail.com"
+		newPassword := createRandomPassword()
+		InitDB()
+		changeUserPassword(subtest, addUserRecorder, userEmail, newPassword)
+		verifyNotFoundErrThrown(subtest, addUserRecorder)
+	})
+}
+
+func createRandomPassword() string {
+	randomId := createRandomUserInteger()
+	return fmt.Sprintf("pass%d", randomId)
+}
+
+func changeUserPassword(test *testing.T, addUserRecorder *httptest.ResponseRecorder, userEmail string, newPassword string) {
+	putUserContext := createContextWithEmailEncoded(addUserRecorder, userEmail)
+	putUserContext.Request, _ = http.NewRequest(http.MethodPost, "/", bytes.NewBuffer([]byte(fmt.Sprintf(`{"password" : "%s"}`, newPassword))))
+	HandlePutUser(putUserContext)
+}
+
+func verifyUpdateOccurred(test *testing.T, addUserRecorder *httptest.ResponseRecorder, userEmail string, newPassword string) {
+	test.Helper()
+	verifyNoErrThrown(test, addUserRecorder)
+	verifyUserPasswordChanged(test, userEmail, newPassword)
+}
+
+func verifyUserPasswordChanged(test *testing.T, userEmail string, newPassword string) {
+	test.Helper()
+	readUserRecorder := httptest.NewRecorder()
+	callReadUserEndpoint(test, readUserRecorder, userEmail)
+	verifyCorrectPassword(test, readUserRecorder, newPassword)
+}
+
+func verifyCorrectPassword(test *testing.T, readUserRecorder *httptest.ResponseRecorder, newPassword string) {
+	test.Helper()
+	observedPassword := getUserPassword(readUserRecorder.Body.String())
+	if observedPassword != newPassword {
+		test.Errorf("Expected password of %q, instead got %q", newPassword, observedPassword)
+	}
+}
+
+func getUserPassword(userInfo string) string {
+	var userMap map[string]string
+	json.Unmarshal([]byte(userInfo), &userMap)
+	return userMap["password"]
 }
