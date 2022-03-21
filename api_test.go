@@ -26,21 +26,21 @@ func (e *enduser) getJsonRepresentingUser() string {
 func TestAddUser(test *testing.T) {
 	test.Run("Add New User", func(subtest *testing.T) {
 		addUserRecorder := httptest.NewRecorder()
-		userToAdd := createUserToAdd()
+		userToAdd := createNewUser()
 		InitDB()
 		callAddUserEndpoint(subtest, addUserRecorder, userToAdd)
 		verifyUserAdded(subtest, addUserRecorder, userToAdd)
 	})
 	test.Run("Add Existent User", func(subtest *testing.T) {
 		addUserRecorder := httptest.NewRecorder()
-		userToAdd := enduser{id: 10, password: "something", email: "somebody@gmail.com"}
+		userToAdd := createExistentUser()
 		InitDB()
 		callAddUserEndpoint(subtest, addUserRecorder, userToAdd)
 		verifyConflictErrThrown(subtest, addUserRecorder)
 	})
 }
 
-func createUserToAdd() enduser {
+func createNewUser() enduser {
 	userId := createRandomUserId()
 	password := "randompass"
 	email := fmt.Sprintf("ronald%d@gmail.com", userId)
@@ -52,6 +52,10 @@ func createRandomUserId() int {
 	maxId := 100000
 	source := rand.NewSource(randomSeed)
 	return rand.New(source).Intn(maxId)
+}
+
+func createExistentUser() enduser {
+	return enduser{id: 10, password: "something", email: "somebody@gmail.com"}
 }
 
 func callAddUserEndpoint(test *testing.T, addUserRecorder *httptest.ResponseRecorder, userToAdd enduser) {
