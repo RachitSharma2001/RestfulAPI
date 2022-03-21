@@ -17,6 +17,7 @@ func main() {
 	router.GET("/enduser/:email", HandleGetUserByEmail)
 	router.POST("/enduser", HandleAddUser)
 	router.PUT("/enduser/:email", HandlePutUser)
+	router.DELETE("/enduser/:email", HandleDeleteUser)
 	router.Run(":8080")
 }
 
@@ -35,39 +36,37 @@ func throwConnectionError(err error) {
 
 func HandleGetUserByEmail(context *gin.Context) {
 	email := context.Param("email")
-	user := map[string]interface{}{}
-	resultOfFind := db.Table("enduser").Where("email = ?", email).Take(&user)
-	if errorExists(resultOfFind.Error) {
-		context.IndentedJSON(http.StatusNotFound, resultOfFind.Error)
+	if !userExists(email) {
+		context.IndentedJSON(http.StatusNotFound, gin.H{"success": "false", "error": "user not found"})
 	} else {
+		user := map[string]interface{}{}
+		db.Table("enduser").Where("email = ?", email).Take(&user)
 		context.IndentedJSON(http.StatusOK, &user)
-	}
-}
-
-func HandleAddUser(context *gin.Context) {
-	user := map[string]interface{}{}
-	context.BindJSON(&user)
-	result := db.Table("enduser").Create(&user)
-	if errorExists(result.Error) {
-		context.IndentedJSON(http.StatusConflict, result.Error)
-	} else {
-		context.IndentedJSON(http.StatusOK, `{"success" : "true"}`)
 	}
 }
 
 func HandlePutUser(context *gin.Context) {
 	email := context.Param("email")
+	user := map[string]interface{}{}
+	bindErr := context.ShouldBindJSON(&user)
 	if !userExists(email) {
-		context.IndentedJSON(http.StatusNotFound, `{"success" : "false", "error" : "user not found"}`)
+		context.IndentedJSON(http.StatusNotFound, gin.H{"success": "false", "error": "user not found"})
+	} else if errorExists(bindErr) {
+		context.IndentedJSON(http.StatusBadRequest, gin.H{"success": "false", "error": "Invalid password data given"})
+	} else {
+		db.Table("enduser").Where("email = ?", email).Update("password", user["password"])
+		context.IndentedJSON(http.StatusOK, gin.H{"success": "true"})
+	}
+}
+
+func HandleDeleteUser(context *gin.Context) {
+	email := context.Param("email")
+	if !userExists(email) {
+		context.IndentedJSON(http.StatusNotFound, gin.H{"success": "false", "error": "user not found"})
 	} else {
 		user := map[string]interface{}{}
-		context.BindJSON(&user)
-		resultOfUpdate := db.Table("enduser").Where("email = ?", email).Update("password", user["password"])
-		if errorExists(resultOfUpdate.Error) {
-			context.IndentedJSON(http.StatusBadRequest, `{"success" : "false", "error" : "Invalid format"}`)
-		} else {
-			context.IndentedJSON(http.StatusOK, `{"success" : "true"}`)
-		}
+		db.Table("enduser").Where("email = ?", email).Delete(&user)
+		context.IndentedJSON(http.StatusOK, gin.H{"success": "true"})
 	}
 }
 
@@ -76,6 +75,17 @@ func userExists(email string) bool {
 	resultOfReadUser := db.Table("enduser").Where("email = ?", email).Take(&user)
 	fmt.Printf("Read user error: %v\n", resultOfReadUser.Error)
 	return !errorExists(resultOfReadUser.Error)
+}
+
+func HandleAddUser(context *gin.Context) {
+	user := map[string]interface{}{}
+	context.BindJSON(&user)
+	result := db.Table("enduser").Create(&user)
+	if errorExists(result.Error) {
+		context.IndentedJSON(http.StatusConflict, gin.H{"success": "false", "error": "user already exists"})
+	} else {
+		context.IndentedJSON(http.StatusOK, gin.H{"success": "true"})
+	}
 }
 
 func errorExists(err error) bool {
