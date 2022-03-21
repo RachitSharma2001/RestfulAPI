@@ -24,7 +24,40 @@ func (e *enduser) getJsonRepresentingUser() string {
 	return fmt.Sprintf(`{"id" : %d, "password" : "%s", "email" : "%s"}`, e.id, e.password, e.email)
 }
 
-func TestAddUser(test *testing.T) {
+func TestDelete(test *testing.T) {
+	newUser := createNewUser()
+	addUserToDb(test, newUser)
+	deleteUser(test, newUser)
+	verifyUserDeleted(test, newUser)
+}
+
+func addUserToDb(test *testing.T, userToAdd enduser) {
+	test.Helper()
+	InitDB()
+	addUserRecorder := httptest.NewRecorder()
+	callAddUserEndpoint(test, addUserRecorder, userToAdd)
+	CloseDB()
+}
+
+func deleteUser(test *testing.T, userToDelete enduser) {
+	test.Helper()
+	InitDB()
+	deleteUserRecorder := httptest.NewRecorder()
+	deleteUserContext := createContextWithEmailEncoded(deleteUserRecorder, userToDelete.email)
+	HandleDeleteUser(deleteUserContext)
+	CloseDB()
+}
+
+func verifyUserDeleted(test *testing.T, user enduser) {
+	test.Helper()
+	InitDB()
+	readUserRecorder := httptest.NewRecorder()
+	callReadUserEndpoint(test, readUserRecorder, user.email)
+	verifyNotFoundErrThrown(test, readUserRecorder)
+	CloseDB()
+}
+
+func TestPost(test *testing.T) {
 	test.Run("Add New User", func(subtest *testing.T) {
 		addUserRecorder := httptest.NewRecorder()
 		userToAdd := createNewUser()
@@ -91,10 +124,10 @@ func readUserFromDb(test *testing.T, userEmail string) string {
 	return readUserRecorder.Body.String()
 }
 
-func TestReadUser(test *testing.T) {
+func TestGet(test *testing.T) {
 	test.Run("Reading an existent user", func(subtest *testing.T) {
 		recorder := httptest.NewRecorder()
-		userEmail := "somebody@gmail.com"
+		userEmail := "james@gmail.com"
 		InitDB()
 		callReadUserEndpoint(subtest, recorder, userEmail)
 		verifyCorrectRead(subtest, recorder)
@@ -166,7 +199,7 @@ func errorCodesMatch(expectedErrCode, observedErrCode int) bool {
 func verifyCorrectUserRead(test *testing.T, recorder *httptest.ResponseRecorder) {
 	test.Helper()
 	observedJson := recorder.Body.String()
-	expectedJson := `{"id" : 10, "password" : "something", "email" : "somebody@gmail.com"}`
+	expectedJson := `{"id" : 5, "password" : "sfsdfs", "email" : "james@gmail.com"}`
 	checkCorrectJsonOutput(test, expectedJson, observedJson)
 }
 
@@ -230,37 +263,4 @@ func getUserPassword(userInfo string) string {
 	var userMap map[string]string
 	json.Unmarshal([]byte(userInfo), &userMap)
 	return userMap["password"]
-}
-
-func TestDelete(test *testing.T) {
-	newUser := createNewUser()
-	addUserToDb(test, newUser)
-	deleteUser(test, newUser)
-	verifyUserDeleted(test, newUser)
-}
-
-func addUserToDb(test *testing.T, userToAdd enduser) {
-	test.Helper()
-	InitDB()
-	addUserRecorder := httptest.NewRecorder()
-	callAddUserEndpoint(test, addUserRecorder, userToAdd)
-	CloseDB()
-}
-
-func deleteUser(test *testing.T, userToDelete enduser) {
-	test.Helper()
-	InitDB()
-	deleteUserRecorder := httptest.NewRecorder()
-	deleteUserContext := createContextWithEmailEncoded(deleteUserRecorder, userToDelete.email)
-	HandleDeleteUser(deleteUserContext)
-	CloseDB()
-}
-
-func verifyUserDeleted(test *testing.T, user enduser) {
-	test.Helper()
-	InitDB()
-	readUserRecorder := httptest.NewRecorder()
-	callReadUserEndpoint(test, readUserRecorder, user.email)
-	verifyNotFoundErrThrown(test, readUserRecorder)
-	CloseDB()
 }
