@@ -31,6 +31,13 @@ func TestAddUser(test *testing.T) {
 		callAddUserEndpoint(subtest, addUserRecorder, userToAdd)
 		verifyUserAdded(subtest, addUserRecorder, userToAdd)
 	})
+	test.Run("Add Existent User", func(subtest *testing.T) {
+		addUserRecorder := httptest.NewRecorder()
+		userToAdd := enduser{id: 10, password: "something", email: "somebody@gmail.com"}
+		InitDB()
+		callAddUserEndpoint(subtest, addUserRecorder, userToAdd)
+		verifyConflictErrThrown(subtest, addUserRecorder)
+	})
 }
 
 func createUserToAdd() enduser {
@@ -43,8 +50,8 @@ func createUserToAdd() enduser {
 func createRandomUserId() int {
 	randomSeed := time.Now().UnixNano()
 	maxId := 100000
-	s1 := rand.NewSource(randomSeed)
-	return rand.New(s1).Intn(maxId)
+	source := rand.NewSource(randomSeed)
+	return rand.New(source).Intn(maxId)
 }
 
 func callAddUserEndpoint(test *testing.T, addUserRecorder *httptest.ResponseRecorder, userToAdd enduser) {
@@ -80,11 +87,20 @@ func readUserFromDb(test *testing.T, userEmail string) string {
 }
 
 func TestReadUser(test *testing.T) {
-	recorder := httptest.NewRecorder()
-	userEmail := "somebody@gmail.com"
-	InitDB()
-	callReadUserEndpoint(test, recorder, userEmail)
-	verifyCorrectRead(test, recorder)
+	test.Run("Reading an existent user", func(subtest *testing.T) {
+		recorder := httptest.NewRecorder()
+		userEmail := "somebody@gmail.com"
+		InitDB()
+		callReadUserEndpoint(subtest, recorder, userEmail)
+		verifyCorrectRead(subtest, recorder)
+	})
+	test.Run("Reading a nonexistent user", func(subtest *testing.T) {
+		recorder := httptest.NewRecorder()
+		userEmail := "notanyonehere@gmail.com"
+		InitDB()
+		callReadUserEndpoint(subtest, recorder, userEmail)
+		verifyNotFoundErrThrown(subtest, recorder)
+	})
 }
 
 func callReadUserEndpoint(test *testing.T, recorder *httptest.ResponseRecorder, userEmail string) {
@@ -113,6 +129,20 @@ func verifyCorrectRead(test *testing.T, recorder *httptest.ResponseRecorder) {
 func verifyNoErrThrown(test *testing.T, recorder *httptest.ResponseRecorder) {
 	test.Helper()
 	expectedErrCode := http.StatusOK
+	observedErrCode := recorder.Code
+	checkCorrectErrorCode(test, expectedErrCode, observedErrCode)
+}
+
+func verifyNotFoundErrThrown(test *testing.T, recorder *httptest.ResponseRecorder) {
+	test.Helper()
+	expectedErrCode := http.StatusNotFound
+	observedErrCode := recorder.Code
+	checkCorrectErrorCode(test, expectedErrCode, observedErrCode)
+}
+
+func verifyConflictErrThrown(test *testing.T, recorder *httptest.ResponseRecorder) {
+	test.Helper()
+	expectedErrCode := http.StatusConflict
 	observedErrCode := recorder.Code
 	checkCorrectErrorCode(test, expectedErrCode, observedErrCode)
 }

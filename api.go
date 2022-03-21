@@ -35,8 +35,12 @@ func throwConnectionError(err error) {
 func HandleGetUserByEmail(context *gin.Context) {
 	email := context.Param("email")
 	user := map[string]interface{}{}
-	db.Table("enduser").Where("email = ?", email).Take(&user)
-	context.IndentedJSON(http.StatusOK, &user)
+	resultOfFind := db.Table("enduser").Where("email = ?", email).Take(&user)
+	if errorExists(resultOfFind.Error) {
+		context.IndentedJSON(http.StatusNotFound, resultOfFind.Error)
+	} else {
+		context.IndentedJSON(http.StatusOK, &user)
+	}
 }
 
 func HandleAddUser(context *gin.Context) {
@@ -44,7 +48,7 @@ func HandleAddUser(context *gin.Context) {
 	context.BindJSON(&user)
 	result := db.Table("enduser").Create(&user)
 	if errorExists(result.Error) {
-		context.IndentedJSON(http.StatusBadRequest, result.Error)
+		context.IndentedJSON(http.StatusConflict, result.Error)
 	} else {
 		context.IndentedJSON(http.StatusOK, `{"success" : "true"}`)
 	}
