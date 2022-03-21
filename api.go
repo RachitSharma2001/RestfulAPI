@@ -16,6 +16,7 @@ func main() {
 	router := gin.Default()
 	router.GET("/enduser/:email", HandleGetUserByEmail)
 	router.POST("/enduser", HandleAddUser)
+	router.PUT("/enduser/:email", HandlePutUser)
 	router.Run(":8080")
 }
 
@@ -52,6 +53,29 @@ func HandleAddUser(context *gin.Context) {
 	} else {
 		context.IndentedJSON(http.StatusOK, `{"success" : "true"}`)
 	}
+}
+
+func HandlePutUser(context *gin.Context) {
+	email := context.Param("email")
+	if !userExists(email) {
+		context.IndentedJSON(http.StatusNotFound, `{"success" : "false", "error" : "user not found"}`)
+	} else {
+		user := map[string]interface{}{}
+		context.BindJSON(&user)
+		resultOfUpdate := db.Table("enduser").Where("email = ?", email).Update("password", user["password"])
+		if errorExists(resultOfUpdate.Error) {
+			context.IndentedJSON(http.StatusBadRequest, `{"success" : "false", "error" : "Invalid format"}`)
+		} else {
+			context.IndentedJSON(http.StatusOK, `{"success" : "true"}`)
+		}
+	}
+}
+
+func userExists(email string) bool {
+	user := map[string]interface{}{}
+	resultOfReadUser := db.Table("enduser").Where("email = ?", email).Take(&user)
+	fmt.Printf("Read user error: %v\n", resultOfReadUser.Error)
+	return !errorExists(resultOfReadUser.Error)
 }
 
 func errorExists(err error) bool {
