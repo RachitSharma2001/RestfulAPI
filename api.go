@@ -30,6 +30,7 @@ func HandleAddUser(context *gin.Context) {
 	user := map[string]interface{}{}
 	bindErr := context.ShouldBindJSON(&user)
 	createUserErr := db.Table("enduser").Create(&user).Error
+	setContentType(context)
 	if errorExists(bindErr) {
 		encodeBadRequestInContext(context)
 	} else if errorExists(createUserErr) {
@@ -41,6 +42,7 @@ func HandleAddUser(context *gin.Context) {
 
 func HandleGetUserByEmail(context *gin.Context) {
 	email := context.Param("email")
+	setContentType(context)
 	if !userExists(email) {
 		encodeNotFoundErrInContext(context)
 	} else {
@@ -59,6 +61,7 @@ func HandlePutUser(context *gin.Context) {
 	email := context.Param("email")
 	user := map[string]interface{}{}
 	bindErr := context.ShouldBindJSON(&user)
+	setContentType(context)
 	if !userExists(email) {
 		encodeNotFoundErrInContext(context)
 	} else if errorExists(bindErr) {
@@ -75,12 +78,17 @@ func changeUserPasswordInDb(email string, newPassword interface{}) {
 
 func HandleDeleteUser(context *gin.Context) {
 	email := context.Param("email")
+	setContentType(context)
 	if !userExists(email) {
 		encodeNotFoundErrInContext(context)
 	} else {
 		deleteUserFromDb(email)
 		encodeSuccessInContext(context)
 	}
+}
+
+func setContentType(context *gin.Context) {
+	context.Header("Content-Type", "application/json; charset=utf-8")
 }
 
 func deleteUserFromDb(email string) {
