@@ -1,10 +1,7 @@
 package main
 
 import (
-	"database/sql"
-	"fmt"
 	"net/http"
-	"os"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -16,45 +13,17 @@ var userAlreadyExistsMsg map[string]interface{} = gin.H{"success": "false", "err
 var successMsg map[string]interface{} = gin.H{"success": "true"}
 var badRequestMsg map[string]interface{} = gin.H{"success": "false", "error": "Invalid data given"}
 
+func init() {
+	db = InitDB()
+}
+
 func main() {
-	InitDB()
 	router := gin.Default()
 	router.GET("/enduser/:email", HandleGetUserByEmail)
 	router.POST("/enduser", HandleAddUser)
 	router.PUT("/enduser/:email", HandlePutUser)
 	router.DELETE("/enduser/:email", HandleDeleteUser)
 	router.Run(":8080")
-}
-
-func InitDB() {
-	var err error
-	db, err = GetDatabase()
-	if errorExists(err) {
-		throwConnectionError(err)
-	}
-}
-
-func CloseDB() {
-	sqlDb, err := db.DB()
-	if errorExists(err) {
-		throwCloseError(err)
-	} else {
-		closeSqlDB(sqlDb)
-	}
-}
-
-func throwConnectionError(err error) {
-	fmt.Printf("Unexpected connection error: %v", err)
-	os.Exit(3)
-}
-
-func throwCloseError(err error) {
-	fmt.Printf("Unexpected error while closing: %v", err)
-	os.Exit(3)
-}
-
-func closeSqlDB(sqlDb *sql.DB) {
-	sqlDb.Close()
 }
 
 func HandleAddUser(context *gin.Context) {
